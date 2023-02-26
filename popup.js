@@ -7,7 +7,7 @@ elements.forEach((element) => {
     ids.push(number);
 });
 
-function convertToGrade(markParam) {
+function convertToGpa(markParam) {
     if (markParam >= 17) {
         return 4.33;
     } else if (markParam >= 13) {
@@ -42,7 +42,7 @@ var execution = 0;
 async function fetchPerYear(num) {
     try {
         var grades = [];
-        var gpaGrades = [];
+        var gpas = [];
         var coefficients = [];
         var gpaWeightedAverage;
         var gradeWeightedAverage;
@@ -56,20 +56,18 @@ async function fetchPerYear(num) {
         var parser = new DOMParser();
         var htmlDoc = parser.parseFromString(data, "text/html");
 
-        console.log(htmlDoc)
-
         // Select all the <tr> elements from the parsed HTML
         var trElements = htmlDoc.querySelectorAll("tr");
 
         // Iterate over each <tr> element and retrieve the values
         trElements.forEach(function (trElement) {
             if (trElement.children.length > 12) {
-                var mark = parseInt(trElement.children[9].textContent);
-                var coefficient = trElement.children[11].textContent;
+                const mark = parseInt(trElement.children[9].textContent);
+                const coefficient = trElement.children[11].textContent;
                 if (!isNaN(mark) && coefficient.includes("/")) {
                     grades.push(mark);
-                    gpaGrades.push(convertToGrade(mark));
-                    coefficients.push(coefficient);
+                    gpas.push(convertToGpa(mark));
+                    coefficients.push(parseFloat(coefficient.split("/")[1]));
                 }
             }
         });
@@ -78,14 +76,13 @@ async function fetchPerYear(num) {
         let gradesWeightedSum = 0;
         let gpaWeightedSum = 0;
         let coefficientsSum = 0;
-        for (let i_1 = 0; i_1 < gpaGrades.length; i_1++) {
-            const numerator = parseFloat(coefficients[i_1].split("/")[1]);
-            gradesWeightedSum += grades[i_1] * numerator;
-            gpaWeightedSum += gpaGrades[i_1] * numerator;
-            coefficientsSum += numerator;
+        for (let i_1 = 0; i_1 < gpas.length; i_1++) {
+            gradesWeightedSum += grades[i_1] * coefficients[i_1];
+            gpaWeightedSum += gpas[i_1] * coefficients[i_1];
+            coefficientsSum += coefficients[i_1];
         }
 
-        gradeWeightedAverage = Math.round((gradesWeightedSum * 100) / coefficientsSum) / 100;
+        gradeWeightedAverage = Math.round((gradesWeightedSum * 10) / coefficientsSum) / 10;
         gpaWeightedAverage = Math.round((gpaWeightedSum * 100) / coefficientsSum) / 100;
 
         allGradeWeightedSum += gradesWeightedSum;
@@ -105,7 +102,7 @@ async function fetchPerYear(num) {
         execution++;
 
         if (ids.length == execution) {
-            var allGpaWeightedAverage = Math.round((allGpaWeightedSum * 100) / allCoefSum) / 100;
+            var allGpaWeightedAverage = Math.round((allGpaWeightedSum * 10) / allCoefSum) / 10;
             var allGradeWeightedAverage = Math.round((allGradeWeightedSum * 100) / allCoefSum) / 100;
             addToHtml("global", allGpaWeightedAverage, allGradeWeightedAverage);
         }
