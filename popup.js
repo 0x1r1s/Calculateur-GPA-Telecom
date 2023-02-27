@@ -27,19 +27,19 @@ class Grade {
     }
 
     getGpa() {
-        if (value >= 17) {
+        if (this.value >= 17) {
             return 4.33;
-        } else if (value >= 13) {
+        } else if (this.value >= 13) {
             return 4;
-        } else if (value >= 12) {
+        } else if (this.value >= 12) {
             return 3.5;
-        } else if (value >= 10) {
+        } else if (this.value >= 10) {
             return 3;
-        } else if (value >= 9) {
+        } else if (this.value >= 9) {
             return 2;
-        } else if (value >= 8) {
+        } else if (this.value >= 8) {
             return 1.5;
-        } else if (value >= 5) {
+        } else if (this.value >= 5) {
             return 1;
         } else {
             return 0;
@@ -111,8 +111,6 @@ async function fetchPerYear(num) {
         var parser = new DOMParser();
         var htmlDoc = parser.parseFromString(data, "text/html");
 
-        console.log(htmlDoc);
-
         // Select all the <tr> elements from the parsed HTML
         var trElements = htmlDoc.querySelectorAll("tr");
 
@@ -137,7 +135,6 @@ async function fetchPerYear(num) {
                 }
                 if (uePart.includes("/") && coefficient.includes("/") && cat != "") {
                     uePartEcts += parseFloat(coefficient.split("/")[0]);
-                    console.log(uePartEcts);
                 }
             }
         });
