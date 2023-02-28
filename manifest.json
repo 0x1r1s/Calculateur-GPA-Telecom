@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Calculateur GPA Télécom",
-    "description": "Un Calculateur de GPA pour Télécom Paris. Made by Antoine Breton",
-    "version": "1.0",
+    "description": "Un Calculateur de GPA pour Télécom Paris. Made by Antoine Breton & Tristan Perrot",
+    "version": "1.1",
     "action": {
       "default_icon": "image.png"
     },
@@ -12,7 +12,7 @@
     "content_scripts": [
         {
           "matches": ["https://synapses.telecom-paris.fr/mon-dossier-pedagogique/*"],
-          "js": ["popup2.js", "popup.js"]
+          "js": ["popup.js"]
         }
       ]
   }
