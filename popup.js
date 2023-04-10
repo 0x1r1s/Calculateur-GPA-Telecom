@@ -8,7 +8,7 @@ elements.forEach((element) => {
 });
 
 class Grade {
-    constructor(value, coefficient, name) {
+    constructor(value, coefficient, name, spe=null) {
         this.value = value;
         this.coefficient = coefficient;
         this.name = name;
@@ -122,15 +122,20 @@ async function fetchPerYear(num) {
 
                 const cat = trElement.children[4].textContent;
                 const uePart = trElement.children[18].textContent;
+                const humTandem = trElement.children[2].textContent;
 
                 if (!isNaN(mark) && coefficient.includes("/")) {
-                    grades.push(new Grade(mark, parseFloat(coefficient.split("/")[1])));
+                    const name = trElement.children[2].textContent;
+                    grades.push(new Grade(mark, parseFloat(coefficient.split("/")[1]), name));
                 }
 
                 if (cat == "FH" && coefficient.includes("/")) {
                     fhEcts += parseFloat(coefficient.split("/")[0]);
                 }
-                if (cat == "HUM" && coefficient.includes("/")) {
+                else if (cat == "HUM" && coefficient.includes("/")) {
+                    humEcts += parseFloat(coefficient.split("/")[0]);
+                }
+                else if (humTandem.includes("HUM-TANDEM") && coefficient.includes("/")) {
                     humEcts += parseFloat(coefficient.split("/")[0]);
                 }
                 if (uePart.includes("/") && coefficient.includes("/") && cat != "") {
@@ -198,6 +203,6 @@ async function fetchPerYear(num) {
 addTextToHtml("-----------------------------------------");
 
 ids.forEach(async (id) => {
-    console.log(id);
+    console.log("Grades obtained here (private): https://synapses.telecom-paris.fr/liste-notes/" + id);
     await fetchPerYear(id);
 });
