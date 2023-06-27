@@ -8,10 +8,11 @@ elements.forEach((element) => {
 });
 
 class Grade {
-    constructor(value, coefficient, name, spe=null) {
+    constructor(value, ects, name, coefficient = null) {
         this.value = value;
-        this.coefficient = coefficient;
+        this.ects = ects;
         this.name = name;
+        this.coefficient = coefficient;
     }
 
     getName() {
@@ -24,6 +25,10 @@ class Grade {
 
     getCoefficient() {
         return this.coefficient;
+    }
+
+    getEcts() {
+        return this.ects;
     }
 
     getGpa() {
@@ -51,7 +56,7 @@ class Grade {
     }
 
     getMarkWeighted() {
-        return this.getMark() * this.getCoefficient();
+        return this.getMark() * this.getEcts();
     }
 };
 
@@ -74,7 +79,7 @@ function countNeededCourse(name, ectsDone) {
 function addGradeToHtml(when, gpaValue, gradeValue) {
     const h1Element = document.querySelector("h1");
     const newElement = document.createElement("p");
-    newElement.innerText = "Ton GPA " + when + " est: " + gpaValue + " ( Moyenne: " + gradeValue + " )";
+    newElement.innerText = "Ton GPA de " + when + " est: " + gpaValue + " ( Moyenne: " + gradeValue + " )";
     h1Element.insertAdjacentElement("afterend", newElement);
 };
 
@@ -93,10 +98,31 @@ var fhEcts = 0;
 var humEcts = 0;
 var uePartEcts = 0;
 
+var allEcts = new Array(ids.length).fill(0);
+
 var execution = 0;
+
+const ectsFirstYear = 46;
+const ectsSecondYear = 60;
+const sumEctsNeeded = 120;
+const diplomaEcts = 180;
 
 async function fetchPerYear(num) {
     try {
+        var when = "";
+        var year;
+        // Determining the year
+        if (ids[ids.length - 1] == num) {
+            when = "1ère année";
+            year = 1;
+        } else if (ids[ids.length - 2] == num) {
+            when = "2nde année";
+            year = 2;
+        } else if (ids[ids.length - 3] == num) {
+            when = "3ème année";
+            year = 3;
+        }
+
         var grades = [];
 
         var gpaWeightedAverage;
@@ -114,6 +140,12 @@ async function fetchPerYear(num) {
         // Select all the <tr> elements from the parsed HTML
         var trElements = htmlDoc.querySelectorAll("tr");
 
+        if (trElements.length <= 4) {
+            addTextToHtml("Tu n'as pas encore de notes pour ta " + when + " !");
+            execution++;
+            return;
+        }
+
         // Iterate over each <tr> element and retrieve the values
         trElements.forEach(function (trElement) {
             if (trElement.children.length > 12) {
@@ -124,22 +156,30 @@ async function fetchPerYear(num) {
                 const uePart = trElement.children[18].textContent;
                 const humTandem = trElement.children[2].textContent;
 
-                if (!isNaN(mark) && coefficient.includes("/")) {
-                    const name = trElement.children[2].textContent;
-                    grades.push(new Grade(mark, parseFloat(coefficient.split("/")[1]), name));
-                }
+                if (coefficient.includes("/")) {
+                    const ects = parseFloat(coefficient.split("/")[0]);
+                    const coef = parseFloat(coefficient.split("/")[1]);
 
-                if (cat == "FH" && coefficient.includes("/")) {
-                    fhEcts += parseFloat(coefficient.split("/")[0]);
-                }
-                else if (cat == "HUM" && coefficient.includes("/")) {
-                    humEcts += parseFloat(coefficient.split("/")[0]);
-                }
-                else if (humTandem.includes("HUM-TANDEM") && coefficient.includes("/")) {
-                    humEcts += parseFloat(coefficient.split("/")[0]);
-                }
-                if (uePart.includes("/") && coefficient.includes("/") && cat != "") {
-                    uePartEcts += parseFloat(coefficient.split("/")[0]);
+                    if (!isNaN(mark)) {
+                        const name = trElement.children[2].textContent;
+                        grades.push(new Grade(mark, ects, name, coef));
+                        console.log("Added grade: " + mark + " " + ects + " " + name);
+                        allEcts[year - 1] += ects;
+                    }
+
+                    if (cat == "FH") {
+                        fhEcts += ects;
+                        allEcts[year - 1] += ects;
+                    }
+                    else if (cat == "HUM") {
+                        humEcts += ects;
+                    }
+                    else if (humTandem.includes("HUM-TANDEM")) {
+                        humEcts += ects;
+                    }
+                    if (uePart.includes("/") && cat != "") {
+                        uePartEcts += ects;
+                    }
                 }
             }
         });
@@ -163,17 +203,8 @@ async function fetchPerYear(num) {
         allGpaWeightedSum += gpaWeightedSum;
         allCoefSum += coefficientsSum;
 
-        // Determining the year
-        if (ids[ids.length - 1] == num) {
-            when = "de 1ère année";
-        } else if (ids[ids.length - 2] == num) {
-            when = "de 2nde année";
-        } else if (ids[ids.length - 3] == num) {
-            when = "de 3ème année";
-        }
-
         addGradeToHtml(when, gpaWeightedAverage, gradeWeightedAverage);
-        
+
         execution++;
 
         if (ids.length == execution) {
@@ -184,12 +215,74 @@ async function fetchPerYear(num) {
             addGradeToHtml("global", allGpaWeightedAverage, allGradeWeightedAverage);
             addTextToHtml("-----------------------------------------");
 
+            var needText = "Il te faut valider encore minimum:\n";
+            var pixelPerfect = "Tu es nickel en crédit:\n";
+            var noNeedText = "Tu as trop de crédits:\n";
+
+            var fhEctsNeeded = countNeededCourse("FH", fhEcts);
+            var humEctsNeeded = countNeededCourse("HUM", humEcts);
+            var uePartEctsNeeded = countNeededCourse("UE part", uePartEcts);
+
+            if (fhEctsNeeded > 0) {
+                needText += "- FH: " + fhEctsNeeded + " ects\n";
+            } else if (fhEctsNeeded == 0) {
+                pixelPerfect += "- FH: " + fhEctsNeeded + " ects\n";
+            } else {
+                noNeedText += "- FH: " + (-fhEctsNeeded) + " ects en trop !\n";
+            }
+
+            if (humEctsNeeded > 0) {
+                needText += "- HUM: " + humEctsNeeded + " ects\n";
+            } else if (humEctsNeeded == 0) {
+                pixelPerfect += "- HUM: " + humEctsNeeded + " ects\n";
+            } else {
+                noNeedText += "- HUM: " + (-humEctsNeeded) + " ects en trop !\n";
+            }
+
+            if (uePartEctsNeeded > 0) {
+                needText += "- UE part: " + uePartEctsNeeded + " ects\n";
+            } else if (uePartEctsNeeded == 0) {
+                pixelPerfect += "- UE part: " + uePartEctsNeeded + " ects\n";
+            } else {
+                noNeedText += "- UE part: " + (-uePartEctsNeeded) + " ects en trop !\n";
+            }
+
             addTextToHtml(
-                "Il te faut valider encore minimum:\n\n" +
-                "- HUM: " + countNeededCourse("HUM", humEcts) + " ects\n" +
-                "- FH: " + countNeededCourse("FH", fhEcts) + " ects\n" +
-                "- UE part: " + countNeededCourse("UE part", uePartEcts) + " ects"
+                needText + "\n" + pixelPerfect + "\n" + noNeedText
             );
+
+            addTextToHtml("-----------------------------------------");
+
+
+
+            var yearSummary = "Tu as " + allEcts[0] + " ects en 1ère année\n"
+
+            if (allEcts[0] < ectsFirstYear) {
+                yearSummary += "Il te faut encore " + (ectsFirstYear - allEcts[0]) + " ects pour passer en 2ème année\n";
+            } else {
+                yearSummary += "Tu as assez d'ects pour passer en 2ème année\n";
+            }
+
+
+            if (allEcts.length > 1) {
+                yearSummary += "\nTu as " + allEcts[1] + " ects en 2ème année\n";
+                if (allEcts[1] < ectsSecondYear) {
+                    yearSummary += "Il te faut encore " + (ectsSecondYear - allEcts[1]) + " ects pour passer en 3ème année\n";
+                }
+                if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
+                    yearSummary += "\nAttention il te manque encore " + (sumEctsNeeded - allEcts[1] - allEcts[0]) + " ects pour avoir 120 ects après 2 ans\n";
+                } else {
+                    yearSummary += "\nTu as " + allEcts[0] + allEcts[1] + " ects en 2 ans donc assez d'ects après 2 ans\n";
+                }
+            }
+
+            if (allEcts.length > 2) {
+                yearSummary += "\nTu as " + allEcts[2] + " ects en 3ème année\n";
+                if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
+                    yearSummary += "Il te faut encore " + (diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]) + " ects pour avoir ton diplôme\n";
+                }
+            }
+            addTextToHtml(yearSummary);
 
             addTextToHtml("-----------------------------------------");
         }
