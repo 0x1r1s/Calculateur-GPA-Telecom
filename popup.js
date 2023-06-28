@@ -272,7 +272,7 @@ async function fetchPerYear(num) {
                 if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
                     yearSummary += "\nAttention il te manque encore " + (sumEctsNeeded - allEcts[1] - allEcts[0]) + " ects pour avoir 120 ects après 2 ans\n";
                 } else {
-                    yearSummary += "\nTu as " + allEcts[0] + allEcts[1] + " ects en 2 ans donc assez d'ects après 2 ans\n";
+                    yearSummary += "\nTu as " + (allEcts[0] + allEcts[1]) + " ects en 2 ans donc assez d'ects après 2 ans\n";
                 }
             }
 
