@@ -158,7 +158,6 @@ async function fetchPerYear(num) {
                     if (!isNaN(mark)) {
                         const name = trElement.children[2].textContent;
                         grades.push(new Grade(mark, name, coef));
-                        console.log("Added grade: " + mark + " " + ects + " " + name);
                         allEcts[year - 1] += ects;
                     }
 
@@ -280,6 +279,7 @@ async function fetchPerYear(num) {
             addTextToHtml(yearSummary);
 
             addTextToHtml("-----------------------------------------");
+
         }
 
         return gpaWeightedAverage;
