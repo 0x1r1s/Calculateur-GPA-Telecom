@@ -8,9 +8,8 @@ elements.forEach((element) => {
 });
 
 class Grade {
-    constructor(value, ects, name, coefficient = null) {
+    constructor(value, name, coefficient = null) {
         this.value = value;
-        this.ects = ects;
         this.name = name;
         this.coefficient = coefficient;
     }
@@ -25,10 +24,6 @@ class Grade {
 
     getCoefficient() {
         return this.coefficient;
-    }
-
-    getEcts() {
-        return this.ects;
     }
 
     getGpa() {
@@ -56,7 +51,7 @@ class Grade {
     }
 
     getMarkWeighted() {
-        return this.getMark() * this.getEcts();
+        return this.getMark() * this.getCoefficient();
     }
 };
 
@@ -162,7 +157,7 @@ async function fetchPerYear(num) {
 
                     if (!isNaN(mark)) {
                         const name = trElement.children[2].textContent;
-                        grades.push(new Grade(mark, ects, name, coef));
+                        grades.push(new Grade(mark, name, coef));
                         console.log("Added grade: " + mark + " " + ects + " " + name);
                         allEcts[year - 1] += ects;
                     }
