@@ -1,5 +1,5 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "Calculateur GPA Télécom",
   "description": "Un Calculateur de GPA pour Télécom Paris. Made by Antoine Breton & Tristan Perrot",
   "version": "1.3.3",
