@@ -154,6 +154,7 @@ async function fetchPerYear(num) {
                 if (coefficient.includes("/")) {
                     const ects = parseFloat(coefficient.split("/")[0]);
                     const coef = parseFloat(coefficient.split("/")[1]);
+                    console.log(coef + " for " + mark + " in " + cat);
 
                     if (!isNaN(mark)) {
                         const name = trElement.children[2].textContent;
@@ -171,6 +172,10 @@ async function fetchPerYear(num) {
                     else if (humTandem.includes("HUM-TANDEM")) {
                         humEcts += ects;
                     }
+                    else if (cat == "SES" && isNaN(mark)) {
+                        allEcts[year - 1] += ects;
+                    }
+                    
                     if (uePart.includes("/") && cat != "") {
                         uePartEcts += ects;
                     }
