@@ -8,9 +8,10 @@ elements.forEach((element) => {
 });
 
 class Grade {
-    constructor(value, name, coefficient = null) {
+    constructor(value, name, period, coefficient = null) {
         this.value = value;
         this.name = name;
+        this.period = period;
         this.coefficient = coefficient;
     }
 
@@ -53,6 +54,18 @@ class Grade {
     getMarkWeighted() {
         return this.getMark() * this.getCoefficient();
     }
+
+    getSemester() {
+
+     // Seperating S1 and S2 (if S1-S2 count as S1, if not specified count as S2) 
+
+        if (this.period.includes("S1")) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
 };
 
 function countNeededCourse(name, ectsDone) {
@@ -122,6 +135,8 @@ async function fetchPerYear(num) {
 
         var gpaWeightedAverage;
         var gradeWeightedAverage;
+        var gradeWeightedAverageS1;
+        var gradeWeightedAverageS2;
 
         const response = await fetch(
             "https://synapses.telecom-paris.fr/liste-notes/" + num
@@ -146,6 +161,7 @@ async function fetchPerYear(num) {
             if (trElement.children.length > 12) {
                 const mark = parseFloat(trElement.children[9].textContent);
                 const coefficient = trElement.children[11].textContent;
+                const period = trElement.children[3].textContent;
 
                 const cat = trElement.children[4].textContent;
                 const uePart = trElement.children[18].textContent;
@@ -157,7 +173,7 @@ async function fetchPerYear(num) {
 
                     if (!isNaN(mark)) {
                         const name = trElement.children[2].textContent;
-                        grades.push(new Grade(mark, name, coef));
+                        grades.push(new Grade(mark, name, period, coef));
                         allEcts[year - 1] += ects;
                     }
 
@@ -186,22 +202,49 @@ async function fetchPerYear(num) {
         let gradesWeightedSum = 0;
         let gpaWeightedSum = 0;
         let coefficientsSum = 0;
+
+        let gradesWeightedSumS1 = 0;
+        let coefficientsSumS1 = 0;
+
+        let gradesWeightedSumS2 = 0;
+        let coefficientsSumS2 = 0;
+        
         for (let i_1 = 0; i_1 < grades.length; i_1++) {
             gradesWeightedSum += grades[i_1].getMarkWeighted();
             gpaWeightedSum += grades[i_1].getGpaWeighted();
             coefficientsSum += grades[i_1].getCoefficient();
+
+            // Seperating S1 and S2 (if S1-S2 count as S1, if not specified count as S2) 
+            if (grades[i_1].getSemester() == 1) {
+                gradesWeightedSumS1 += grades[i_1].getMarkWeighted()
+                coefficientsSumS1 += grades[i_1].getCoefficient()
+            } else if (grades[i_1].getSemester() == 2){
+                gradesWeightedSumS2 += grades[i_1].getMarkWeighted()
+                coefficientsSumS2 += grades[i_1].getCoefficient()
+            }
         }
 
         gradeWeightedAverage =
             Math.round((gradesWeightedSum * 10) / coefficientsSum) / 10;
+        
+        gradeWeightedAverageS1 =
+            Math.round((gradesWeightedSumS1 * 10) / coefficientsSumS1) / 10;
+        
+        gradeWeightedAverageS2 =
+            Math.round((gradesWeightedSumS2 * 10) / coefficientsSumS2) / 10;
+
         gpaWeightedAverage =
             Math.round((gpaWeightedSum * 100) / coefficientsSum) / 100;
+
 
         allGradeWeightedSum += gradesWeightedSum;
         allGpaWeightedSum += gpaWeightedSum;
         allCoefSum += coefficientsSum;
 
+
         addGradeToHtml(when, gpaWeightedAverage, gradeWeightedAverage);
+        addTextToHtml("En " + when + " ta moyenne de S1 est : "+gradeWeightedAverageS1 + " et ta moyenne de S2 est : "+gradeWeightedAverageS2);
+        addTextToHtml("-----------------------------------------");
 
         execution++;
 
