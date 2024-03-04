@@ -374,9 +374,11 @@ const setupSheet = (idNote) => {
         );
         console.log(solved);
         const workbook = XLSX.utils.book_new();
-        solved.forEach((one, index) => {
-            const sheet = XLSX.utils.aoa_to_sheet(one.value);
-            XLSX.utils.book_append_sheet(workbook, sheet, `${index + 1}A`);
+        solved.forEach((onePromise, index) => {
+            if (typeof onePromise.value !== "undefined") {
+                const sheet = XLSX.utils.aoa_to_sheet(onePromise.value);
+                XLSX.utils.book_append_sheet(workbook, sheet, `${index + 1}A`);
+            }
         });
 
         XLSX.writeFileXLSX(workbook, `${new Date().toISOString().slice(0, 10)}_note.xlsx`, {});
