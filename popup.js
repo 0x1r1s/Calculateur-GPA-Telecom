@@ -367,7 +367,19 @@ const setupSheet = (idNote) => {
                         const parser = new DOMParser();
                         const htmlDoc = parser.parseFromString(text, "text/html");
                         const a = htmlDoc.querySelectorAll("table")[2].rows;
-                        const table = [...a].map((oneTr) => [...oneTr.children].map((oneTd) => oneTd.innerText));
+                        const table = [...a].map((oneTr) =>
+                            [...oneTr.children]
+                                .map((oneTd, indexCol) => {
+                                    if (indexCol > 10) {
+                                        if (oneTd.innerText.includes("Cr ") || oneTd.innerText.includes("ECTS")) {
+                                            return [oneTd.innerText, `${oneTd.innerText} MAX`];
+                                        }
+                                        return oneTd.innerText == "" ? ["", ""] : oneTd.innerText.split("/");
+                                    }
+                                    return oneTd.innerText;
+                                })
+                                .flat()
+                        );
                         return table;
                     })
             )
