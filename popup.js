@@ -15,10 +15,6 @@ class Grade {
         this.coefficient = coefficient;
     }
 
-    getName() {
-        return this.name;
-    }
-
     getMark() {
         return this.value;
     }
@@ -66,38 +62,18 @@ class Grade {
         }
     }
 
-};
-
-function countNeededCourse(name, ectsDone) {
-    var ectsNeeded;
-    switch (name) {
-        case "FH":
-            ectsNeeded = 6;
-            break;
-        case "HUM":
-            ectsNeeded = 1.5;
-            break;
-        case "UE part":
-            ectsNeeded = 15;
-            break;
-    }
-    return ectsNeeded - ectsDone;
-};
+}
 
 function addTextToHtml(text) {
     const h1Element = document.querySelector("h1");
     const newElement = document.createElement("p");
     newElement.innerText = text;
     h1Element.insertAdjacentElement("afterend", newElement);
-};
+}
 
 var allGradeWeightedSum = 0;
 var allGpaWeightedSum = 0;
 var allCoefSum = 0;
-
-var fhEcts = 0;
-var humEcts = 0;
-var uePartEcts = 0;
 
 var allEcts = new Array(ids.length).fill(0);
 
@@ -126,43 +102,20 @@ function paddwithSep(text) {
     return sep + " " + text + " " + sep + paddOdd + "\n";
 }
 
-function extractCreditsData() {
-    const table = document.querySelector("#recapitulatifs-credits tbody");
-    const rows = table.querySelectorAll("tr");
-    const creditsData = {};
-
-    rows.forEach(row => {
-        const cells = row.querySelectorAll("td");
-        const category = cells[0].textContent.trim();
-        const required = parseFloat(cells[1].textContent.trim());
-        const acquired = parseFloat(cells[2].textContent.trim());
-        const inProgress = parseFloat(cells[5].textContent.trim());
-
-        creditsData[category] = {
-            required: required,
-            acquired: acquired,
-            inProgress: inProgress
-        };
-    });
-
-    return creditsData;
-}
-
+// Function to format the extracted credit category data
 function formatCreditsData(creditsData) {
     let formattedText = paddwithSep("Crédits par catégorie") + "\n";
     let first = true;
 
     for (const category in creditsData) {
-        if (category === "Ects") {
-            continue;
-        }
+        const data = creditsData[category];
+        const remaining = data.required - data.acquired
+
         formattedText += first ? "" : "\n";
         first = false;
-        const data = creditsData[category];
-        const remaining = data.required - data.acquired - data.inProgress;
 
         if (remaining > 0) {
-            formattedText += `\t- ${category}: Il te faut encore ${remaining} ECTS (${data.acquired} acquis pour ${data.required} requis pour le moment) ❌\n`;
+            formattedText += `\t- ${category}: Il te faut encore ${remaining} ECTS (${data.acquired} acquis pour ${data.required} requis) ❌\n`;
         } else if (remaining === 0) {
             formattedText += `\t- ${category}: ${data.acquired} ECTS pour ${data.required} requis ✅\n`;
         } else {
@@ -173,54 +126,58 @@ function formatCreditsData(creditsData) {
     return formattedText + "\n";
 }
 
+async function fetchCreditsData() {
+    try {
+        // Extract student ID (####) from the current URL
+        const currentUrl = window.location.href;
+        const match = currentUrl.match(/mon-dossier-pedagogique\/(\d+)/);
+        if (!match) {
+            console.error("Student ID not found in URL.");
+            return;
+        }
+        const studentId = match[1];
 
-const link = document.querySelector("a[onclick*='modal-consulter-notes']");
-if (link) {
-    link.click(); // Open modal programmatically
-}
+        // Fetch the credit summary page
+        const response = await fetch(`/dossier-pedagogique/${studentId}/recapitulatifs-credits`);
+        const data = await response.text();
 
-let catText = "";
+        // Parse the response HTML
+        const parser = new DOMParser();
+        const htmlDoc = parser.parseFromString(data, "text/html");
+        const table = htmlDoc.querySelector("#recapitulatifs-credits tbody");
 
-// Observe changes until the table appears
-const observer = new MutationObserver((mutations, obs) => {
-    const table = document.querySelector("#recapitulatifs-credits tbody");
-    if (table) {
-        catText = formatCreditsData(extractCreditsData());
-        obs.disconnect();
-
-        // Get modal and close it the correct way
-        const modal = document.getElementById("modal-consulter-notes");
-        if (modal) {
-            // Simulate closing action
-            const closeButton = modal.querySelector("[data-dismiss='modal'], .close");
-            if (closeButton) {
-                closeButton.click(); // Use the built-in closing behavior
-            } else {
-                // Fallback if no close button exists
-                modal.classList.remove("show"); // Remove Bootstrap's "show" class
-                modal.style.display = "none"; // Hide modal
-                modal.setAttribute("aria-hidden", "true");
-
-                // Reset body scroll in case it was disabled
-                document.body.classList.remove("modal-open");
-                document.body.style.overflow = "auto";
-
-                // Remove backdrop if present (Bootstrap modals)
-                const backdrop = document.querySelector(".modal-backdrop");
-                if (backdrop) {
-                    backdrop.remove();
-                }
-            }
+        if (!table) {
+            console.error("Table not found in the fetched page.");
+            return;
         }
 
-        // Dispatch event when data is ready
-        const event = new Event("creditsDataReady");
-        document.dispatchEvent(event);
-    }
-});
+        // Extract credits data
+        const creditsData = {};
+        const rows = table.querySelectorAll("tr");
 
-// Start observing
-observer.observe(document.body, { childList: true, subtree: true });
+        rows.forEach(row => {
+            const cells = row.querySelectorAll("td");
+            if (cells.length >= 6) {
+                const category = cells[0].textContent.trim().replace("Cr ", ""); // Remove "Cr " prefix
+                const required = parseFloat(cells[1].textContent.trim());
+                const acquired = parseFloat(cells[2].textContent.trim());
+
+                if (category !== "Ects") {
+                    creditsData[category] = {
+                        required: required,
+                        acquired: acquired,
+                    };
+                }
+            }
+        });
+
+        return formatCreditsData(creditsData);
+
+
+    } catch (error) {
+        console.error("Error fetching credits data:", error);
+    }
+}
 
 async function fetchPerYear(id, yearText, repeatedYears) {
     try {
@@ -280,8 +237,6 @@ async function fetchPerYear(id, yearText, repeatedYears) {
                 const period = trElement.children[3].textContent;
 
                 const cat = trElement.children[4].textContent;
-                const uePart = trElement.children[18].textContent;
-                const humTandem = trElement.children[2].textContent;
 
                 if (coefficient.includes("/")) {
                     const ects = parseFloat(coefficient.split("/")[0]);
@@ -293,19 +248,10 @@ async function fetchPerYear(id, yearText, repeatedYears) {
                         allEcts[year - 1] += ects;
                     }
 
-                    if (cat == "FH") {
-                        fhEcts += ects;
+                    if (cat === "FH") {
                         allEcts[year - 1] += ects;
-                    } else if (cat == "HUM") {
-                        humEcts += ects;
-                    } else if (humTandem.includes("HUM-TANDEM")) {
-                        humEcts += ects;
-                    } else if (cat == "SES" && isNaN(mark)) {
+                    } else if (cat === "SES" && isNaN(mark)) {
                         allEcts[year - 1] += ects;
-                    }
-
-                    if (uePart.includes("/") && cat != "") {
-                        uePartEcts += ects;
                     }
                 }
             }
@@ -328,11 +274,11 @@ async function fetchPerYear(id, yearText, repeatedYears) {
             coefficientsSum += grades[i_1].getCoefficient();
             gpaWeigtedSum += grades[i_1].getGpaWeighted();
 
-            if (grades[i_1].getSemester() == 1) {
+            if (grades[i_1].getSemester() === 1) {
                 gradesWeightedSumS1 += grades[i_1].getMarkWeighted();
                 coefficientsSumS1 += grades[i_1].getCoefficient();
                 gpaWeigtedSumS1 += grades[i_1].getGpaWeighted();
-            } else if (grades[i_1].getSemester() == 2) {
+            } else if (grades[i_1].getSemester() === 2) {
                 gradesWeightedSumS2 += grades[i_1].getMarkWeighted();
                 coefficientsSumS2 += grades[i_1].getCoefficient();
                 gpaWeigtedSumS2 += grades[i_1].getGpaWeighted();
@@ -362,64 +308,64 @@ async function fetchPerYear(id, yearText, repeatedYears) {
     }
 }
 
-document.addEventListener("creditsDataReady", () => {
-    document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
+document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
 
-        if (execution > 0) {
-            return;
+    if (execution > 0) {
+        return;
+    }
+
+    const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
+    const yearText = panel.querySelector('.panel-title a').textContent.trim();
+
+    const result = await fetchPerYear(panelId, yearText, repeatedYears);
+    results.push(result);
+
+    if (results.length === document.querySelectorAll('.panel-group .panel').length) {
+        results.sort((a, b) => b.year - a.year); // Chronological order
+        results.forEach(result => {
+            addTextToHtml(result.text + "\n");
+        });
+        addTextToHtml(paddwithSep("Moyennes par année"));
+
+        let recapText = paddwithSep("Crédits par année") + "\n";
+        recapText += `Tu as ${allEcts[0]} ECTS en 1ère année.\n`;
+        if (allEcts[0] < ectsFirstYear) {
+            recapText += `Il te faut encore ${ectsFirstYear - allEcts[0]} ECTS pour passer en 2ème année ❌\n`;
+        } else {
+            recapText += "Tu as assez d'ECTS pour passer en 2ème année ✅\n";
         }
 
-        const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
-        const yearText = panel.querySelector('.panel-title a').textContent.trim();
-
-        const result = await fetchPerYear(panelId, yearText, repeatedYears);
-        results.push(result);
-
-        if (results.length === document.querySelectorAll('.panel-group .panel').length) {
-            results.sort((a, b) => b.year - a.year); // Chronological order
-            results.forEach(result => {
-                addTextToHtml(result.text + "\n");
-            });
-            addTextToHtml(paddwithSep("Moyennes par année"));
-
-            let recapText = paddwithSep("Crédits par année") + "\n";
-            recapText += `Tu as ${allEcts[0]} ECTS en 1ère année.\n`;
-            if (allEcts[0] < ectsFirstYear) {
-                recapText += `Il te faut encore ${ectsFirstYear - allEcts[0]} ECTS pour passer en 2ème année ❌\n`;
+        if (allEcts.length > 1) {
+            recapText += `\nTu as ${allEcts[1]} ECTS en 2ème année.\n`;
+            if (allEcts[1] < ectsSecondYear) {
+                recapText += `Il te faut encore ${ectsSecondYear - allEcts[1]} ECTS pour valider la 2ème année ❌\n`;
+            }
+            if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
+                recapText += `Attention il te manque encore ${sumEctsNeeded - allEcts[1] - allEcts[0]} ECTS pour avoir ${sumEctsNeeded} ECTS après 2 ans et passer en 3ème année ❌\n`;
             } else {
-                recapText += "Tu as assez d'ECTS pour passer en 2ème année ✅\n";
+                recapText += `Tu as ${allEcts[0] + allEcts[1]} ECTS en 2 ans donc assez d'ECTS après 2 ans pour passer en 3ème année ✅\n`;
             }
-
-            if (allEcts.length > 1) {
-                recapText += `\nTu as ${allEcts[1]} ECTS en 2ème année.\n`;
-                if (allEcts[1] < ectsSecondYear) {
-                    recapText += `Il te faut encore ${ectsSecondYear - allEcts[1]} ECTS pour valider la 2ème année ❌\n`;
-                }
-                if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
-                    recapText += `Attention il te manque encore ${sumEctsNeeded - allEcts[1] - allEcts[0]} ECTS pour avoir ${sumEctsNeeded} ECTS après 2 ans et passer en 3ème année ❌\n`;
-                } else {
-                    recapText += `Tu as ${allEcts[0] + allEcts[1]} ECTS en 2 ans donc assez d'ECTS après 2 ans pour passer en 3ème année ✅\n`;
-                }
-            }
-
-            if (allEcts.length > 2) {
-                recapText += `\nTu as ${allEcts[2]} ECTS en 3ème année.\n`;
-                if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
-                    recapText += `Il te faut encore ${diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]} ECTS pour avoir les ${diplomaEcts} requis pour ton diplôme (${allEcts[0] + allEcts[1] + allEcts[2]} acquis pour le moment) ❌\n\n`;
-                } else {
-                    recapText += `Tu as ${allEcts[0] + allEcts[1] + allEcts[2]} ECTS donc assez d'ECTS pour avoir ton diplôme 🍾\n\n`;
-                }
-            }
-
-            let gpaText = paddwithSep("Moyenne Générale") + "\n";
-            var allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
-            var allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
-            gpaText += `Ton GPA général est de ${allGpaWeightedAverage.toFixed(2)}.\n`
-            gpaText += `Ta moyenne générale est de ${allGradeWeightedAverage.toFixed(1)}.\n\n`;
-
-            addTextToHtml(gpaText);
-            addTextToHtml(catText);
-            addTextToHtml(recapText);
         }
-    });
+
+        if (allEcts.length > 2) {
+            recapText += `\nTu as ${allEcts[2]} ECTS en 3ème année.\n`;
+            if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
+                recapText += `Il te faut encore ${diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]} ECTS pour avoir les ${diplomaEcts} requis pour ton diplôme (${allEcts[0] + allEcts[1] + allEcts[2]} acquis pour le moment) ❌\n\n`;
+            } else {
+                recapText += `Tu as ${allEcts[0] + allEcts[1] + allEcts[2]} ECTS donc assez d'ECTS pour avoir ton diplôme 🍾\n\n`;
+            }
+        }
+
+        let gpaText = paddwithSep("Moyenne Générale") + "\n";
+        var allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
+        var allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
+        gpaText += `Ton GPA général est de ${allGpaWeightedAverage.toFixed(2)}.\n`
+        gpaText += `Ta moyenne générale est de ${allGradeWeightedAverage.toFixed(1)}.\n\n`;
+
+        let catText = await fetchCreditsData()
+
+        addTextToHtml(gpaText);
+        addTextToHtml(catText);
+        addTextToHtml(recapText);
+    }
 });
