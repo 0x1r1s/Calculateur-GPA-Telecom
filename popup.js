@@ -15,10 +15,6 @@ class Grade {
         this.coefficient = coefficient;
     }
 
-    getName() {
-        return this.name;
-    }
-
     getMark() {
         return this.value;
     }
@@ -56,6 +52,7 @@ class Grade {
     }
 
     getSemester() {
+
         // Seperating S1 and S2 (if S1-S2 count as S1, if not specified count as S2)
 
         if (this.period.includes("S1")) {
@@ -64,59 +61,19 @@ class Grade {
             return 2;
         }
     }
-}
 
-function countNeededCourse(name, ectsDone) {
-    var ectsNeeded;
-    switch (name) {
-        case "FH":
-            ectsNeeded = 6;
-            break;
-        case "HUM":
-            ectsNeeded = 1.5;
-            break;
-        case "UE part":
-            ectsNeeded = 15;
-            break;
-    }
-    return ectsNeeded - ectsDone;
 }
 
 function addTextToHtml(text) {
     const h1Element = document.querySelector("h1");
-    let details = document.getElementById("details-extension");
-    if (!details) {
-        details = document.createElement("details");
-        details.id = "details-extension";
-        details.open = true;
-        details.innerHTML = "<summary>Details note by Calculateur :)</summary>";
-        h1Element.insertAdjacentElement("afterend", details);
-        const style = document.createElement("style");
-        style.innerHTML = `#details-extension > p{
-            margin: 0px;
-        }
-        #details-extension > summary{
-            display: list-item !important;
-        }
-        `;
-        document.head.appendChild(style);
-    }
     const newElement = document.createElement("p");
     newElement.innerText = text;
-    details.append(newElement);
-}
-
-function addGradeToHtml(when, gpaValue, gradeValue) {
-    addTextToHtml("Ton GPA de " + when + " est: " + gpaValue + " ( Moyenne: " + gradeValue + " )");
+    h1Element.insertAdjacentElement("afterend", newElement);
 }
 
 var allGradeWeightedSum = 0;
 var allGpaWeightedSum = 0;
 var allCoefSum = 0;
-
-var fhEcts = 0;
-var humEcts = 0;
-var uePartEcts = 0;
 
 var allEcts = new Array(ids.length).fill(0);
 
@@ -127,46 +84,152 @@ const ectsSecondYear = 60;
 const sumEctsNeeded = 120;
 const diplomaEcts = 180;
 
-async function fetchPerYear(num) {
-    try {
-        var when = "";
-        var year;
-        // Determining the year
-        if (ids[ids.length - 1] == num) {
-            when = "1ère année";
-            year = 1;
-        } else if (ids[ids.length - 2] == num) {
-            when = "2nde année";
-            year = 2;
-        } else if (ids[ids.length - 3] == num) {
-            when = "3ème année";
-            year = 3;
+const repeatedYears = {};
+const results = [];
+
+const separator = "-";
+const separatorMaxRepeat = 75;
+
+function paddwithSep(text) {
+    var sep = "";
+    for (var i = 0; i < separatorMaxRepeat - Math.round(text.length/2); i++) {
+        sep += separator;
+    }
+    var paddOdd = "";
+    if (text.length % 2 !== 0) {
+        paddOdd = separator;
+    }
+    return sep + " " + text + " " + sep + paddOdd + "\n";
+}
+
+// Function to format the extracted credit category data
+function formatCreditsData(creditsData) {
+    let formattedText = paddwithSep("Crédits par catégorie") + "\n";
+    let first = true;
+
+    for (const category in creditsData) {
+        const data = creditsData[category];
+        const remaining = data.required - data.acquired
+
+        formattedText += first ? "" : "\n";
+        first = false;
+
+        if (remaining > 0) {
+            formattedText += `\t- ${category}: Il te faut encore ${remaining} ECTS (${data.acquired} acquis pour ${data.required} requis) ❌\n`;
+        } else if (remaining === 0) {
+            formattedText += `\t- ${category}: ${data.acquired} ECTS pour ${data.required} requis ✅\n`;
+        } else {
+            formattedText += `\t- ${category}: ${-remaining} ECTS en trop (${data.acquired} acquis pour ${data.required} requis) ✅\n`;
         }
+    }
 
-        var grades = [];
+    return formattedText + "\n";
+}
 
-        var gpaWeightedAverage;
-        var gradeWeightedAverage;
-        var gradeWeightedAverageS1;
-        var gradeWeightedAverageS2;
+async function fetchCreditsData() {
+    try {
+        // Extract student ID (####) from the current URL
+        const currentUrl = window.location.href;
+        const match = currentUrl.match(/mon-dossier-pedagogique\/(\d+)/);
+        if (!match) {
+            console.error("Student ID not found in URL.");
+            return;
+        }
+        const studentId = match[1];
 
-        const response = await fetch("https://synapses.telecom-paris.fr/liste-notes/" + num);
+        // Fetch the credit summary page
+        const response = await fetch(`/dossier-pedagogique/${studentId}/recapitulatifs-credits`);
         const data = await response.text();
 
-        // Parse the HTML page to a DOM object
-        var parser = new DOMParser();
-        var htmlDoc = parser.parseFromString(data, "text/html");
+        // Parse the response HTML
+        const parser = new DOMParser();
+        const htmlDoc = parser.parseFromString(data, "text/html");
+        const table = htmlDoc.querySelector("#recapitulatifs-credits tbody");
 
-        // Select all the <tr> elements from the parsed HTML
-        var trElements = htmlDoc.querySelectorAll("tr");
-
-        if (trElements.length <= 4) {
-            addTextToHtml("Tu n'as pas encore de notes pour ta " + when + " !");
-            execution++;
+        if (!table) {
+            console.error("Table not found in the fetched page.");
             return;
         }
 
-        // Iterate over each <tr> element and retrieve the values
+        // Extract credits data
+        const creditsData = {};
+        const rows = table.querySelectorAll("tr");
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll("td");
+            if (cells.length >= 6) {
+                const category = cells[0].textContent.trim().replace("Cr ", ""); // Remove "Cr " prefix
+                const required = parseFloat(cells[1].textContent.trim());
+                const acquired = parseFloat(cells[2].textContent.trim());
+
+                if (category !== "Ects") {
+                    creditsData[category] = {
+                        required: required,
+                        acquired: acquired,
+                    };
+                }
+            }
+        });
+
+        return formatCreditsData(creditsData);
+
+
+    } catch (error) {
+        console.error("Error fetching credits data:", error);
+    }
+}
+
+async function fetchPerYear(id, yearText, repeatedYears) {
+    try {
+        const response = await fetch(`https://synapses.telecom-paris.fr/liste-notes/${id}`);
+        const data = await response.text();
+
+        const parser = new DOMParser();
+        const htmlDoc = parser.parseFromString(data, "text/html");
+        const trElements = htmlDoc.querySelectorAll("tr");
+
+        if (trElements.length <= 4) {
+            return { year: parseInt(yearText), text: `En ${yearText} - Diplôme d'ingénieur - césure tu étais en césure` };
+        }
+
+        let when = "";
+        let year = 0;
+
+        trElements.forEach(trElement => {
+            const code = trElement.children[1]?.textContent.trim();
+            if (code === "ING-1A") {
+                when = yearText;
+                year = 1;
+            } else if (code === "ING-2A") {
+                when = yearText;
+                year = 2;
+            } else if (code === "ING-3A") {
+                when = yearText;
+                year = 3;
+            } else if (code === "CES-ACA-2S") {
+                when = `${yearText} - Césure`;
+                year = 0;
+            }
+        });
+
+        if (year === 0) {
+            return { year: parseInt(yearText), text: `${when}:\n\t- Tu étais en césure, pas de notes à afficher.\n`};
+        }
+
+        if (repeatedYears[year]) {
+            when += " (année redoublée)";
+        } else {
+            repeatedYears[year] = true;
+        }
+
+        var grades = [];
+        var gradeWeightedAverage;
+        var gradeWeightedAverageS1;
+        var gradeWeightedAverageS2;
+        var gpaWeigtedAverage;
+        var gpaWeigtedAverageS1;
+        var gpaWeigtedAverageS2;
+
         trElements.forEach(function (trElement) {
             if (trElement.children.length > 12) {
                 const mark = parseFloat(trElement.children[9].textContent);
@@ -174,8 +237,6 @@ async function fetchPerYear(num) {
                 const period = trElement.children[3].textContent;
 
                 const cat = trElement.children[4].textContent;
-                const uePart = trElement.children[18].textContent;
-                const humTandem = trElement.children[2].textContent;
 
                 if (coefficient.includes("/")) {
                     const ects = parseFloat(coefficient.split("/")[0]);
@@ -187,219 +248,124 @@ async function fetchPerYear(num) {
                         allEcts[year - 1] += ects;
                     }
 
-                    if (cat == "FH") {
-                        fhEcts += ects;
+                    if (cat === "FH") {
                         allEcts[year - 1] += ects;
-                    } else if (cat == "HUM") {
-                        humEcts += ects;
-                    } else if (humTandem.includes("HUM-TANDEM")) {
-                        humEcts += ects;
-                    } else if (cat == "SES" && isNaN(mark)) {
+                    } else if (cat === "SES" && isNaN(mark)) {
                         allEcts[year - 1] += ects;
-                    }
-
-                    if (uePart.includes("/") && cat != "") {
-                        uePartEcts += ects;
                     }
                 }
             }
         });
 
-        // Calculating the GPA
         let gradesWeightedSum = 0;
-        let gpaWeightedSum = 0;
         let coefficientsSum = 0;
+        let gpaWeigtedSum = 0;
 
         let gradesWeightedSumS1 = 0;
         let coefficientsSumS1 = 0;
+        let gpaWeigtedSumS1 = 0;
 
         let gradesWeightedSumS2 = 0;
         let coefficientsSumS2 = 0;
+        let gpaWeigtedSumS2 = 0;
 
         for (let i_1 = 0; i_1 < grades.length; i_1++) {
             gradesWeightedSum += grades[i_1].getMarkWeighted();
-            gpaWeightedSum += grades[i_1].getGpaWeighted();
             coefficientsSum += grades[i_1].getCoefficient();
+            gpaWeigtedSum += grades[i_1].getGpaWeighted();
 
-            // Seperating S1 and S2 (if S1-S2 count as S1, if not specified count as S2)
-            if (grades[i_1].getSemester() == 1) {
+            if (grades[i_1].getSemester() === 1) {
                 gradesWeightedSumS1 += grades[i_1].getMarkWeighted();
                 coefficientsSumS1 += grades[i_1].getCoefficient();
-            } else if (grades[i_1].getSemester() == 2) {
+                gpaWeigtedSumS1 += grades[i_1].getGpaWeighted();
+            } else if (grades[i_1].getSemester() === 2) {
                 gradesWeightedSumS2 += grades[i_1].getMarkWeighted();
                 coefficientsSumS2 += grades[i_1].getCoefficient();
+                gpaWeigtedSumS2 += grades[i_1].getGpaWeighted();
             }
         }
 
-        gradeWeightedAverage = Math.round((gradesWeightedSum * 10) / coefficientsSum) / 10;
+        gradeWeightedAverage = gradesWeightedSum / coefficientsSum;
+        gradeWeightedAverageS1 = gradesWeightedSumS1 / coefficientsSumS1;
+        gradeWeightedAverageS2 = gradesWeightedSumS2 / coefficientsSumS2;
 
-        gradeWeightedAverageS1 = Math.round((gradesWeightedSumS1 * 10) / coefficientsSumS1) / 10;
-
-        gradeWeightedAverageS2 = Math.round((gradesWeightedSumS2 * 10) / coefficientsSumS2) / 10;
-
-        gpaWeightedAverage = Math.round((gpaWeightedSum * 100) / coefficientsSum) / 100;
+        gpaWeigtedAverage = gpaWeigtedSum / coefficientsSum;
+        gpaWeigtedAverageS1 = gpaWeigtedSumS1 / coefficientsSumS1;
+        gpaWeigtedAverageS2 = gpaWeigtedSumS2 / coefficientsSumS2;
 
         allGradeWeightedSum += gradesWeightedSum;
-        allGpaWeightedSum += gpaWeightedSum;
         allCoefSum += coefficientsSum;
+        allGpaWeightedSum += gpaWeigtedSum;
 
-        addGradeToHtml(when, gpaWeightedAverage, gradeWeightedAverage);
-        addTextToHtml(
-            "En " +
-                when +
-                " ta moyenne de S1 est : " +
-                gradeWeightedAverageS1 +
-                " et ta moyenne de S2 est : " +
-                gradeWeightedAverageS2
-        );
-        addTextToHtml("-----------------------------------------");
+        const text = `${when}:
+        \t- Moyenne au S1 : ${gradeWeightedAverageS1.toFixed(1)} (GPA: ${gpaWeigtedAverageS1.toFixed(2)}).
+        \t- Moyenne au S2 : ${gradeWeightedAverageS2.toFixed(1)} (GPA: ${gpaWeigtedAverageS2.toFixed(2)}).
+        \t- Moyenne de l'année : ${gradeWeightedAverage.toFixed(1)} (GPA: ${gpaWeigtedAverage.toFixed(2)}).`;
 
-        execution++;
-
-        if (ids.length == execution) {
-            var allGradeWeightedAverage = Math.round((allGradeWeightedSum * 10) / allCoefSum) / 10;
-            var allGpaWeightedAverage = Math.round((allGpaWeightedSum * 100) / allCoefSum) / 100;
-            addGradeToHtml("global", allGpaWeightedAverage, allGradeWeightedAverage);
-            addTextToHtml("-----------------------------------------");
-
-            var needText = "Il te faut valider encore minimum:\n";
-            var pixelPerfect = "Tu es nickel en crédit:\n";
-            var noNeedText = "Tu as trop de crédits:\n";
-
-            var fhEctsNeeded = countNeededCourse("FH", fhEcts);
-            var humEctsNeeded = countNeededCourse("HUM", humEcts);
-            var uePartEctsNeeded = countNeededCourse("UE part", uePartEcts);
-
-            if (fhEctsNeeded > 0) {
-                needText += "- FH: " + fhEctsNeeded + " ects\n";
-            } else if (fhEctsNeeded == 0) {
-                pixelPerfect += "- FH: " + fhEctsNeeded + " ects\n";
-            } else {
-                noNeedText += "- FH: " + -fhEctsNeeded + " ects en trop !\n";
-            }
-
-            if (humEctsNeeded > 0) {
-                needText += "- HUM: " + humEctsNeeded + " ects\n";
-            } else if (humEctsNeeded == 0) {
-                pixelPerfect += "- HUM: " + humEctsNeeded + " ects\n";
-            } else {
-                noNeedText += "- HUM: " + -humEctsNeeded + " ects en trop !\n";
-            }
-
-            if (uePartEctsNeeded > 0) {
-                needText += "- UE part: " + uePartEctsNeeded + " ects\n";
-            } else if (uePartEctsNeeded == 0) {
-                pixelPerfect += "- UE part: " + uePartEctsNeeded + " ects\n";
-            } else {
-                noNeedText += "- UE part: " + -uePartEctsNeeded + " ects en trop !\n";
-            }
-
-            addTextToHtml(needText + "\n" + pixelPerfect + "\n" + noNeedText);
-
-            addTextToHtml("-----------------------------------------");
-
-            var yearSummary = "Tu as " + allEcts[0] + " ects en 1ère année\n";
-
-            if (allEcts[0] < ectsFirstYear) {
-                yearSummary +=
-                    "Il te faut encore " + (ectsFirstYear - allEcts[0]) + " ects pour passer en 2ème année\n";
-            } else {
-                yearSummary += "Tu as assez d'ects pour passer en 2ème année\n";
-            }
-
-            if (allEcts.length > 1) {
-                yearSummary += "\nTu as " + allEcts[1] + " ects en 2ème année\n";
-                if (allEcts[1] < ectsSecondYear) {
-                    yearSummary +=
-                        "Il te faut encore " + (ectsSecondYear - allEcts[1]) + " ects pour passer en 3ème année\n";
-                }
-                if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
-                    yearSummary +=
-                        "\nAttention il te manque encore " +
-                        (sumEctsNeeded - allEcts[1] - allEcts[0]) +
-                        " ects pour avoir 120 ects après 2 ans\n";
-                } else {
-                    yearSummary +=
-                        "\nTu as " + (allEcts[0] + allEcts[1]) + " ects en 2 ans donc assez d'ects après 2 ans\n";
-                }
-            }
-
-            if (allEcts.length > 2) {
-                yearSummary += "\nTu as " + allEcts[2] + " ects en 3ème année\n";
-                if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
-                    yearSummary +=
-                        "Il te faut encore " +
-                        (diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]) +
-                        " ects pour avoir ton diplôme\n";
-                }
-            }
-            addTextToHtml(yearSummary);
-
-            addTextToHtml("-----------------------------------------");
-        }
-
-        return gpaWeightedAverage;
+        return { year: parseInt(yearText), text: text + "\n"};
     } catch (error) {
-        return console.error(error);
+        console.error(error);
     }
 }
 
-addTextToHtml("-----------------------------------------");
+document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
 
-ids.forEach(async (id) => {
-    console.log("Grades obtained here (private): https://synapses.telecom-paris.fr/liste-notes/" + id);
-    await fetchPerYear(id);
-});
+    if (execution > 0) {
+        return;
+    }
 
-const setupSheet = (idNote) => {
-    const h1Element = document.querySelector("h1");
-    const button = document.createElement("button");
-    button.innerText = "Export to XLSX";
+    const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
+    const yearText = panel.querySelector('.panel-title a').textContent.trim();
 
-    button.onclick = async () => {
-        const idsReversed = [...idNote];
-        idsReversed.reverse();
-        const solved = await Promise.allSettled(
-            idsReversed.map((oneId) =>
-                fetch(`https://synapses.telecom-paris.fr/liste-notes/${oneId}`)
-                    .then((resp) => resp.text())
-                    .then((text) => {
-                        const parser = new DOMParser();
-                        const htmlDoc = parser.parseFromString(text, "text/html");
-                        const a = htmlDoc.querySelectorAll("table")[2].rows;
-                        const table = [...a].map((oneTr) =>
-                            [...oneTr.children]
-                                .map((oneTd, indexCol) => {
-                                    if (indexCol > 10) {
-                                        if (oneTd.innerText.includes("Cr ") || oneTd.innerText.includes("ECTS")) {
-                                            return [oneTd.innerText, `${oneTd.innerText} MAX`];
-                                        }
-                                        return oneTd.innerText == "" ? ["", ""] : oneTd.innerText.split("/");
-                                    }
-                                    return oneTd.innerText;
-                                })
-                                .flat()
-                        );
-                        return table;
-                    })
-            )
-        );
-        console.log(solved);
-        const workbook = XLSX.utils.book_new();
-        solved.forEach((onePromise, index) => {
-            if (typeof onePromise.value !== "undefined") {
-                const sheet = XLSX.utils.aoa_to_sheet(onePromise.value);
-                XLSX.utils.book_append_sheet(workbook, sheet, `${index + 1}A`);
-            }
+    const result = await fetchPerYear(panelId, yearText, repeatedYears);
+    results.push(result);
+
+    if (results.length === document.querySelectorAll('.panel-group .panel').length) {
+        results.sort((a, b) => b.year - a.year); // Chronological order
+        results.forEach(result => {
+            addTextToHtml(result.text + "\n");
         });
+        addTextToHtml(paddwithSep("Moyennes par année"));
 
-        XLSX.writeFileXLSX(workbook, `${new Date().toISOString().slice(0, 10)}_note.xlsx`, {});
-    };
-    h1Element.parentElement.append(button);
-};
+        let recapText = paddwithSep("Crédits par année") + "\n";
+        recapText += `Tu as ${allEcts[0]} ECTS en 1ère année.\n`;
+        if (allEcts[0] < ectsFirstYear) {
+            recapText += `Il te faut encore ${ectsFirstYear - allEcts[0]} ECTS pour passer en 2ème année ❌\n`;
+        } else {
+            recapText += "Tu as assez d'ECTS pour passer en 2ème année ✅\n";
+        }
 
-try {
-    setupSheet(ids);
-} catch (e) {
-    console.error(e);
-}
+        if (allEcts.length > 1) {
+            recapText += `\nTu as ${allEcts[1]} ECTS en 2ème année.\n`;
+            if (allEcts[1] < ectsSecondYear) {
+                recapText += `Il te faut encore ${ectsSecondYear - allEcts[1]} ECTS pour valider la 2ème année ❌\n`;
+            }
+            if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
+                recapText += `Attention il te manque encore ${sumEctsNeeded - allEcts[1] - allEcts[0]} ECTS pour avoir ${sumEctsNeeded} ECTS après 2 ans et passer en 3ème année ❌\n`;
+            } else {
+                recapText += `Tu as ${allEcts[0] + allEcts[1]} ECTS en 2 ans donc assez d'ECTS après 2 ans pour passer en 3ème année ✅\n`;
+            }
+        }
+
+        if (allEcts.length > 2) {
+            recapText += `\nTu as ${allEcts[2]} ECTS en 3ème année.\n`;
+            if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
+                recapText += `Il te faut encore ${diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]} ECTS pour avoir les ${diplomaEcts} requis pour ton diplôme (${allEcts[0] + allEcts[1] + allEcts[2]} acquis pour le moment) ❌\n\n`;
+            } else {
+                recapText += `Tu as ${allEcts[0] + allEcts[1] + allEcts[2]} ECTS donc assez d'ECTS pour avoir ton diplôme 🍾\n\n`;
+            }
+        }
+
+        let gpaText = paddwithSep("Moyenne Générale") + "\n";
+        var allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
+        var allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
+        gpaText += `Ton GPA général est de ${allGpaWeightedAverage.toFixed(2)}.\n`
+        gpaText += `Ta moyenne générale est de ${allGradeWeightedAverage.toFixed(1)}.\n\n`;
+
+        let catText = await fetchCreditsData()
+
+        addTextToHtml(gpaText);
+        addTextToHtml(catText);
+        addTextToHtml(recapText);
+    }
+});
