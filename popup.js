@@ -77,8 +77,6 @@ let allCoefSum = 0;
 
 let allEcts = new Array(ids.length).fill(0);
 
-let execution = 0;
-
 const ectsFirstYear = 46;
 const ectsSecondYear = 60;
 const sumEctsNeeded = 120;
@@ -302,10 +300,6 @@ async function fetchPerYear(id, yearText, repeatedYears) {
 }
 
 document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
-
-    if (execution > 0) {
-        return;
-    }
 
     const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
     const yearText = panel.querySelector('.panel-title a').textContent.trim();
