@@ -1,5 +1,8 @@
 const elements = document.querySelectorAll("[id*=collapse-]");
 const ids = [];
+const currentLanguage = document.querySelector('.lang-label')?.getAttribute('data-language') || 'fr_FR';
+const t = window.STRINGS[currentLanguage] || window.STRINGS['fr_FR'];
+console.info(`Language detected: ${currentLanguage}`);
 
 elements.forEach((element) => {
     const id = element.getAttribute("id");
@@ -53,7 +56,7 @@ class Grade {
 
     getSemester() {
 
-        // Seperating S1 and S2 (if S1-S2 count as S1, if not specified count as S2)
+        // Separating S1 and S2 (if S1-S2 count as S1, if not specified count as S2)
 
         if (this.period.includes("S1")) {
             return 1;
@@ -86,7 +89,7 @@ const repeatedYears = {};
 const results = [];
 
 const separator = "-";
-const separatorMaxRepeat = window.innerWidth < 600 ? 30 : 75;
+const separatorMaxRepeat = window.innerWidth < 600 ? 30 : window.innerWidth < 800 ? 50 : 75;
 
 function paddwithSep(text) {
     let sep = "";
@@ -102,7 +105,7 @@ function paddwithSep(text) {
 
 // Function to format the extracted credit category data
 function formatCreditsData(creditsData) {
-    let formattedText = paddwithSep("Crédits par catégorie") + "\n";
+    let formattedText = paddwithSep(t.creditsByCategory) + "\n";
     let first = true;
 
     for (const category in creditsData) {
@@ -113,11 +116,11 @@ function formatCreditsData(creditsData) {
         first = false;
 
         if (remaining > 0) {
-            formattedText += `\t- ${category}: Il te faut encore ${remaining} ECTS (${data.acquired} acquis pour ${data.required} requis) ❌\n`;
+            formattedText += `\t- ${window.interpolateString(t.creditsMissingCategory, {category: category, missing: remaining, acquired: data.acquired, required: data.required})}\n`;
         } else if (remaining === 0) {
-            formattedText += `\t- ${category}: ${data.acquired} ECTS pour ${data.required} requis ✅\n`;
+            formattedText += `\t- ${window.interpolateString(t.creditsEnoughCategory, {category: category, acquired: data.acquired, required: data.required})}\n`;
         } else {
-            formattedText += `\t- ${category}: ${-remaining} ECTS en trop (${data.acquired} acquis pour ${data.required} requis) ✅\n`;
+            formattedText += `\t- ${window.interpolateString(t.creditsExcessCategory, {category: category, excess: -remaining, acquired: data.acquired, required: data.required})}\n`;
         }
     }
 
@@ -177,7 +180,7 @@ async function fetchCreditsData() {
     }
 }
 
-async function fetchPerYear(id, yearText, repeatedYears) {
+async function fetchByYear(id, yearText, repeatedYears) {
     try {
         const response = await fetch(`https://synapses.telecom-paris.fr/liste-notes/${id}`);
         const data = await response.text();
@@ -187,7 +190,7 @@ async function fetchPerYear(id, yearText, repeatedYears) {
         const trElements = htmlDoc.querySelectorAll("tr");
 
         if (trElements.length <= 4) {
-            return { year: parseInt(yearText), text: `${yearText} - En attente de données...` };
+            return { year: parseInt(yearText), text: `${yearText} - ${t.noDataYear}` };
         }
 
         let when = "";
@@ -205,17 +208,17 @@ async function fetchPerYear(id, yearText, repeatedYears) {
                 when = yearText;
                 year = 3;
             } else if (code === "CES-ACA-2S") {
-                when = `${yearText} - Césure`;
+                when = `${yearText} - ${t.gapYear}`;
                 year = 0;
             }
         });
 
         if (year === 0) {
-            return { year: parseInt(yearText), text: `${when}:\n\t- Tu étais en césure, pas de notes à afficher.\n`};
+            return { year: parseInt(yearText), text: `${when}:\n\t- ${t.gapYearDescription}\n`};
         }
 
         if (repeatedYears[year]) {
-            when += " (année redoublée)";
+            when += ` (${t.repeatedYear})`;
         } else {
             repeatedYears[year] = true;
         }
@@ -289,9 +292,9 @@ async function fetchPerYear(id, yearText, repeatedYears) {
         allGpaWeightedSum += gpaWeightedSum;
 
         const text = `${when}:
-        \t- Moyenne au S1 : ${gradeWeightedAverageS1.toFixed(1)} (GPA: ${gpaWeightedAverageS1.toFixed(2)}).
-        \t- Moyenne au S2 : ${gradeWeightedAverageS2.toFixed(1)} (GPA: ${gpaWeightedAverageS2.toFixed(2)}).
-        \t- Moyenne de l'année : ${gradeWeightedAverage.toFixed(1)} (GPA: ${gpaWeightedAverage.toFixed(2)}).`;
+        \t- ${window.interpolateString(t.averageSemester, {semester: "S1", average: gradeWeightedAverageS1.toFixed(1), gpa: gpaWeightedAverageS1.toFixed(2)})}
+        \t- ${window.interpolateString(t.averageSemester, {semester: "S2", average: gradeWeightedAverageS2.toFixed(1), gpa: gpaWeightedAverageS2.toFixed(2)})}
+        \t- ${window.interpolateString(t.averageYear, {average: gradeWeightedAverage.toFixed(1), gpa: gpaWeightedAverage.toFixed(2)})}`;
 
         return { year: parseInt(yearText), text: text + "\n"};
     } catch (error) {
@@ -304,7 +307,7 @@ document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
     const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
     const yearText = panel.querySelector('.panel-title a').textContent.trim();
 
-    const result = await fetchPerYear(panelId, yearText, repeatedYears);
+    const result = await fetchByYear(panelId, yearText, repeatedYears);
     results.push(result);
 
     if (results.length === document.querySelectorAll('.panel-group .panel').length) {
@@ -312,42 +315,42 @@ document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
         results.forEach(result => {
             addTextToHtml(result.text + "\n");
         });
-        addTextToHtml(paddwithSep("Moyennes par année"));
+        addTextToHtml(paddwithSep(t.averagesByYear));
 
-        let recapText = paddwithSep("Crédits par année") + "\n";
-        recapText += `Tu as ${allEcts[0]} ECTS en 1ère année.\n`;
+        let recapText = paddwithSep(t.creditsByYear) + "\n";
+        recapText += `${window.interpolateString(t.creditsEarnedFirstYear, {ects: allEcts[0]})}\n`;
         if (allEcts[0] < ectsFirstYear) {
-            recapText += `Il te faut encore ${ectsFirstYear - allEcts[0]} ECTS pour passer en 2ème année ❌\n`;
+            recapText += `${window.interpolateString(t.missingEctsFirstYear, {missing: ectsFirstYear - allEcts[0]})}\n`;
         } else {
-            recapText += "Tu as assez d'ECTS pour passer en 2ème année ✅\n";
+            recapText += t.enoughEctsFirstYear + "\n";
         }
 
         if (allEcts.length > 1) {
-            recapText += `\nTu as ${allEcts[1]} ECTS en 2ème année.\n`;
+            recapText += `\n${window.interpolateString(t.creditsEarnedSecondYear, {ects: allEcts[1]})}\n`;
             if (allEcts[1] < ectsSecondYear) {
-                recapText += `Il te faut encore ${ectsSecondYear - allEcts[1]} ECTS pour valider la 2ème année ❌\n`;
+                recapText += `${window.interpolateString(t.missingEctsSecondYear, {missing: ectsSecondYear - allEcts[1]})}\n`;
             }
             if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
-                recapText += `Attention il te manque encore ${sumEctsNeeded - allEcts[1] - allEcts[0]} ECTS pour avoir ${sumEctsNeeded} ECTS après 2 ans et passer en 3ème année ❌\n`;
+                recapText += `${window.interpolateString(t.missingEctsAfterTwoYears, {missing: sumEctsNeeded - allEcts[1] - allEcts[0], required: sumEctsNeeded})}\n`;
             } else {
-                recapText += `Tu as ${allEcts[0] + allEcts[1]} ECTS en 2 ans donc assez d'ECTS après 2 ans pour passer en 3ème année ✅\n`;
+                recapText += `${window.interpolateString(t.enoughEctsAfterTwoYears, {acquired: allEcts[0] + allEcts[1]})}\n`;
             }
         }
 
         if (allEcts.length > 2) {
-            recapText += `\nTu as ${allEcts[2]} ECTS en 3ème année.\n`;
+            recapText += `\n${window.interpolateString(t.creditsEarnedThirdYear, {ects: allEcts[2]})}\n`;
             if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
-                recapText += `Il te faut encore ${diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0]} ECTS pour avoir les ${diplomaEcts} requis pour ton diplôme (${allEcts[0] + allEcts[1] + allEcts[2]} acquis pour le moment) ❌\n\n`;
+                recapText += `${window.interpolateString(t.missingEctsForDegree, {missing: diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0], required: diplomaEcts, acquired: allEcts[0] + allEcts[1] + allEcts[2]})}\n\n`;
             } else {
-                recapText += `Tu as ${allEcts[0] + allEcts[1] + allEcts[2]} ECTS donc assez d'ECTS pour avoir ton diplôme 🍾\n\n`;
+                recapText += `${window.interpolateString(t.enoughEctsForDegree, {acquired: allEcts[0] + allEcts[1] + allEcts[2]})}\n\n`;
             }
         }
 
-        let gpaText = paddwithSep("Moyenne Générale") + "\n";
+        let gpaText = paddwithSep(t.generalAverage) + "\n";
         let allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
         let allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
-        gpaText += `Ton GPA général est de ${allGpaWeightedAverage.toFixed(2)}.\n`
-        gpaText += `Ta moyenne générale est de ${allGradeWeightedAverage.toFixed(1)}.\n\n`;
+        gpaText += window.interpolateString(t.generalGPAText, {gpa: allGpaWeightedAverage.toFixed(2)}) + "\n";
+        gpaText += window.interpolateString(t.generalAverageText, {average: allGradeWeightedAverage.toFixed(1)}) + "\n\n";
 
         let catText = await fetchCreditsData()
 

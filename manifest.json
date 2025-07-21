@@ -9,7 +9,7 @@
     "content_scripts": [
         {
             "matches": ["https://synapses.telecom-paris.fr/mon-dossier-pedagogique/*"],
-            "js": ["xlsx.full.min.js", "popup.js"]
+            "js": ["xlsx.full.min.js", "strings.js","popup.js"]
         }
     ]
 }
