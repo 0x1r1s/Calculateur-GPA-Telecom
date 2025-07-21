@@ -189,7 +189,7 @@ async function fetchPerYear(id, yearText, repeatedYears) {
         const trElements = htmlDoc.querySelectorAll("tr");
 
         if (trElements.length <= 4) {
-            return { year: parseInt(yearText), text: `En ${yearText} - Diplôme d'ingénieur - césure tu étais en césure` };
+            return { year: parseInt(yearText), text: `${yearText} - En attente de données...` };
         }
 
         let when = "";
