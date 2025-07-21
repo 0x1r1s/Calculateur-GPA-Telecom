@@ -232,27 +232,20 @@ async function fetchPerYear(id, yearText, repeatedYears) {
 
         trElements.forEach(function (trElement) {
             if (trElement.children.length > 12) {
+                const codeUE = trElement.children[1].textContent.trim();
                 const mark = parseFloat(trElement.children[9].textContent);
                 const coefficient = trElement.children[11].textContent;
                 const period = trElement.children[3].textContent;
 
-                const cat = trElement.children[4].textContent;
-
-                if (coefficient.includes("/")) {
+                if (coefficient.includes("/") && codeUE !== "") {
                     const ects = parseFloat(coefficient.split("/")[0]);
                     const coef = parseFloat(coefficient.split("/")[1]);
 
                     if (!isNaN(mark)) {
                         const name = trElement.children[2].textContent;
                         grades.push(new Grade(mark, name, period, coef));
-                        allEcts[year - 1] += ects;
                     }
-
-                    if (cat === "FH") {
-                        allEcts[year - 1] += ects;
-                    } else if (cat === "SES" && isNaN(mark)) {
-                        allEcts[year - 1] += ects;
-                    }
+                    allEcts[year - 1] += ects;
                 }
             }
         });
