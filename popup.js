@@ -222,13 +222,13 @@ async function fetchPerYear(id, yearText, repeatedYears) {
             repeatedYears[year] = true;
         }
 
-        var grades = [];
-        var gradeWeightedAverage;
-        var gradeWeightedAverageS1;
-        var gradeWeightedAverageS2;
-        var gpaWeigtedAverage;
-        var gpaWeigtedAverageS1;
-        var gpaWeigtedAverageS2;
+        let grades = [];
+        let gradeWeightedAverage;
+        let gradeWeightedAverageS1;
+        let gradeWeightedAverageS2;
+        let gpaWeightedAverage;
+        let gpaWeightedAverageS1;
+        let gpaWeightedAverageS2;
 
         trElements.forEach(function (trElement) {
             if (trElement.children.length > 12) {
@@ -259,29 +259,29 @@ async function fetchPerYear(id, yearText, repeatedYears) {
 
         let gradesWeightedSum = 0;
         let coefficientsSum = 0;
-        let gpaWeigtedSum = 0;
+        let gpaWeightedSum = 0;
 
         let gradesWeightedSumS1 = 0;
         let coefficientsSumS1 = 0;
-        let gpaWeigtedSumS1 = 0;
+        let gpaWeightedSumS1 = 0;
 
         let gradesWeightedSumS2 = 0;
         let coefficientsSumS2 = 0;
-        let gpaWeigtedSumS2 = 0;
+        let gpaWeightedSumS2 = 0;
 
         for (let i_1 = 0; i_1 < grades.length; i_1++) {
             gradesWeightedSum += grades[i_1].getMarkWeighted();
             coefficientsSum += grades[i_1].getCoefficient();
-            gpaWeigtedSum += grades[i_1].getGpaWeighted();
+            gpaWeightedSum += grades[i_1].getGpaWeighted();
 
             if (grades[i_1].getSemester() === 1) {
                 gradesWeightedSumS1 += grades[i_1].getMarkWeighted();
                 coefficientsSumS1 += grades[i_1].getCoefficient();
-                gpaWeigtedSumS1 += grades[i_1].getGpaWeighted();
+                gpaWeightedSumS1 += grades[i_1].getGpaWeighted();
             } else if (grades[i_1].getSemester() === 2) {
                 gradesWeightedSumS2 += grades[i_1].getMarkWeighted();
                 coefficientsSumS2 += grades[i_1].getCoefficient();
-                gpaWeigtedSumS2 += grades[i_1].getGpaWeighted();
+                gpaWeightedSumS2 += grades[i_1].getGpaWeighted();
             }
         }
 
@@ -289,18 +289,18 @@ async function fetchPerYear(id, yearText, repeatedYears) {
         gradeWeightedAverageS1 = gradesWeightedSumS1 / coefficientsSumS1;
         gradeWeightedAverageS2 = gradesWeightedSumS2 / coefficientsSumS2;
 
-        gpaWeigtedAverage = gpaWeigtedSum / coefficientsSum;
-        gpaWeigtedAverageS1 = gpaWeigtedSumS1 / coefficientsSumS1;
-        gpaWeigtedAverageS2 = gpaWeigtedSumS2 / coefficientsSumS2;
+        gpaWeightedAverage = gpaWeightedSum / coefficientsSum;
+        gpaWeightedAverageS1 = gpaWeightedSumS1 / coefficientsSumS1;
+        gpaWeightedAverageS2 = gpaWeightedSumS2 / coefficientsSumS2;
 
         allGradeWeightedSum += gradesWeightedSum;
         allCoefSum += coefficientsSum;
-        allGpaWeightedSum += gpaWeigtedSum;
+        allGpaWeightedSum += gpaWeightedSum;
 
         const text = `${when}:
-        \t- Moyenne au S1 : ${gradeWeightedAverageS1.toFixed(1)} (GPA: ${gpaWeigtedAverageS1.toFixed(2)}).
-        \t- Moyenne au S2 : ${gradeWeightedAverageS2.toFixed(1)} (GPA: ${gpaWeigtedAverageS2.toFixed(2)}).
-        \t- Moyenne de l'année : ${gradeWeightedAverage.toFixed(1)} (GPA: ${gpaWeigtedAverage.toFixed(2)}).`;
+        \t- Moyenne au S1 : ${gradeWeightedAverageS1.toFixed(1)} (GPA: ${gpaWeightedAverageS1.toFixed(2)}).
+        \t- Moyenne au S2 : ${gradeWeightedAverageS2.toFixed(1)} (GPA: ${gpaWeightedAverageS2.toFixed(2)}).
+        \t- Moyenne de l'année : ${gradeWeightedAverage.toFixed(1)} (GPA: ${gpaWeightedAverage.toFixed(2)}).`;
 
         return { year: parseInt(yearText), text: text + "\n"};
     } catch (error) {
@@ -357,8 +357,8 @@ document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
         }
 
         let gpaText = paddwithSep("Moyenne Générale") + "\n";
-        var allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
-        var allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
+        let allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
+        let allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
         gpaText += `Ton GPA général est de ${allGpaWeightedAverage.toFixed(2)}.\n`
         gpaText += `Ta moyenne générale est de ${allGradeWeightedAverage.toFixed(1)}.\n\n`;
 
