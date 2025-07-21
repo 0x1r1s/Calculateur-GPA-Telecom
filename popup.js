@@ -71,13 +71,13 @@ function addTextToHtml(text) {
     h1Element.insertAdjacentElement("afterend", newElement);
 }
 
-var allGradeWeightedSum = 0;
-var allGpaWeightedSum = 0;
-var allCoefSum = 0;
+let allGradeWeightedSum = 0;
+let allGpaWeightedSum = 0;
+let allCoefSum = 0;
 
-var allEcts = new Array(ids.length).fill(0);
+let allEcts = new Array(ids.length).fill(0);
 
-var execution = 0;
+let execution = 0;
 
 const ectsFirstYear = 46;
 const ectsSecondYear = 60;
@@ -91,11 +91,11 @@ const separator = "-";
 const separatorMaxRepeat = 75;
 
 function paddwithSep(text) {
-    var sep = "";
-    for (var i = 0; i < separatorMaxRepeat - Math.round(text.length/2); i++) {
+    let sep = "";
+    for (let i = 0; i < separatorMaxRepeat - Math.round(text.length/2); i++) {
         sep += separator;
     }
-    var paddOdd = "";
+    let paddOdd = "";
     if (text.length % 2 !== 0) {
         paddOdd = separator;
     }
