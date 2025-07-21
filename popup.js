@@ -88,7 +88,7 @@ const repeatedYears = {};
 const results = [];
 
 const separator = "-";
-const separatorMaxRepeat = 75;
+const separatorMaxRepeat = window.innerWidth < 600 ? 30 : 75;
 
 function paddwithSep(text) {
     let sep = "";
