@@ -67,11 +67,17 @@ class Grade {
 
 }
 
-function addTextToHtml(text) {
+let mainHtmlElement = document.createElement("div");
+function addMainHtmlElement(){
     const h1Element = document.querySelector("h1");
+    h1Element.insertAdjacentElement("afterend", mainHtmlElement);
+}
+addMainHtmlElement();
+
+function addTextToHtml(text) {
     const newElement = document.createElement("p");
     newElement.innerText = text;
-    h1Element.insertAdjacentElement("afterend", newElement);
+    mainHtmlElement.appendChild(newElement);
 }
 
 let allGradeWeightedSum = 0;
@@ -85,27 +91,28 @@ const ectsSecondYear = 60;
 const sumEctsNeeded = 120;
 const diplomaEcts = 180;
 
+let results = [];
+
 const repeatedYears = {};
-const results = [];
 
 const separator = "-";
 const separatorMaxRepeat = window.innerWidth < 600 ? 30 : window.innerWidth < 800 ? 50 : 75;
 
-function paddwithSep(text) {
+function padWithSep(text) {
     let sep = "";
     for (let i = 0; i < separatorMaxRepeat - Math.round(text.length/2); i++) {
         sep += separator;
     }
-    let paddOdd = "";
+    let padOdd = "";
     if (text.length % 2 !== 0) {
-        paddOdd = separator;
+        padOdd = separator;
     }
-    return sep + " " + text + " " + sep + paddOdd + "\n";
+    return sep + " " + text + " " + sep + padOdd + "\n";
 }
 
 // Function to format the extracted credit category data
 function formatCreditsData(creditsData) {
-    let formattedText = paddwithSep(t.creditsByCategory) + "\n";
+    let formattedText = padWithSep(t.creditsByCategory) + "\n";
     let first = true;
 
     for (const category in creditsData) {
@@ -127,60 +134,8 @@ function formatCreditsData(creditsData) {
     return formattedText + "\n";
 }
 
-async function fetchCreditsData() {
-    try {
-        // Extract student ID (####) from the current URL
-        const currentUrl = window.location.href;
-        const match = currentUrl.match(/mon-dossier-pedagogique\/(\d+)/);
-        if (!match) {
-            console.error("Student ID not found in URL.");
-            return;
-        }
-        const studentId = match[1];
-
-        // Fetch the credit summary page
-        const response = await fetch(`/dossier-pedagogique/${studentId}/recapitulatifs-credits`);
-        const data = await response.text();
-
-        // Parse the response HTML
-        const parser = new DOMParser();
-        const htmlDoc = parser.parseFromString(data, "text/html");
-        const table = htmlDoc.querySelector("#recapitulatifs-credits tbody");
-
-        if (!table) {
-            console.error("Table not found in the fetched page.");
-            return;
-        }
-
-        // Extract credits data
-        const creditsData = {};
-        const rows = table.querySelectorAll("tr");
-
-        rows.forEach(row => {
-            const cells = row.querySelectorAll("td");
-            if (cells.length >= 6) {
-                const category = cells[0].textContent.trim().replace("Cr ", ""); // Remove "Cr " prefix
-                const required = parseFloat(cells[1].textContent.trim());
-                const acquired = parseFloat(cells[2].textContent.trim());
-
-                if (category !== "Ects") {
-                    creditsData[category] = {
-                        required: required,
-                        acquired: acquired,
-                    };
-                }
-            }
-        });
-
-        return formatCreditsData(creditsData);
-
-
-    } catch (error) {
-        console.error("Error fetching credits data:", error);
-    }
-}
-
-async function fetchByYear(id, yearText, repeatedYears) {
+// Function to extract data by year
+async function fetchByYear(id, yearText) {
     try {
         const response = await fetch(`https://synapses.telecom-paris.fr/liste-notes/${id}`);
         const data = await response.text();
@@ -190,7 +145,7 @@ async function fetchByYear(id, yearText, repeatedYears) {
         const trElements = htmlDoc.querySelectorAll("tr");
 
         if (trElements.length <= 4) {
-            return { year: parseInt(yearText), text: `${yearText} - ${t.noDataYear}` };
+            return { year: parseInt(yearText), text: `${yearText}:\t${t.noDataYear}`, when: yearText, yearCode: -1 };
         }
 
         let when = "";
@@ -214,13 +169,7 @@ async function fetchByYear(id, yearText, repeatedYears) {
         });
 
         if (year === 0) {
-            return { year: parseInt(yearText), text: `${when}:\n\t- ${t.gapYearDescription}\n`};
-        }
-
-        if (repeatedYears[year]) {
-            when += ` (${t.repeatedYear})`;
-        } else {
-            repeatedYears[year] = true;
+            return { year: parseInt(yearText), text: `${when}:\n\t- ${t.gapYearDescription}\n`, yearCode: 0, when: when};
         }
 
         let grades = [];
@@ -296,66 +245,150 @@ async function fetchByYear(id, yearText, repeatedYears) {
         \t- ${window.interpolateString(t.averageSemester, {semester: "S2", average: gradeWeightedAverageS2.toFixed(1), gpa: gpaWeightedAverageS2.toFixed(2)})}
         \t- ${window.interpolateString(t.averageYear, {average: gradeWeightedAverage.toFixed(1), gpa: gpaWeightedAverage.toFixed(2)})}`;
 
-        return { year: parseInt(yearText), text: text + "\n"};
+        return { year: parseInt(yearText), text: text + "\n", yearCode: year, when: when };
     } catch (error) {
         console.error(error);
     }
 }
 
-document.querySelectorAll('.panel-group .panel').forEach(async (panel) => {
+// Process all fetches
+async function fetchAllPanels() {
+    const panels = Array.from(document.querySelectorAll('.panel-group .panel'));
+    const fetchPromises = panels.map(panel => {
+        const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
+        const yearText = panel.querySelector('.panel-title a').textContent.trim();
+        return fetchByYear(panelId, yearText);
+    });
+    results = await Promise.all(fetchPromises);
 
-    const panelId = panel.querySelector('.panel-heading').id.split('-')[2];
-    const yearText = panel.querySelector('.panel-title a').textContent.trim();
-
-    const result = await fetchByYear(panelId, yearText, repeatedYears);
-    results.push(result);
-
-    if (results.length === document.querySelectorAll('.panel-group .panel').length) {
-        results.sort((a, b) => b.year - a.year); // Chronological order
-        results.forEach(result => {
-            addTextToHtml(result.text + "\n");
-        });
-        addTextToHtml(paddwithSep(t.averagesByYear));
-
-        let recapText = paddwithSep(t.creditsByYear) + "\n";
-        recapText += `${window.interpolateString(t.creditsEarnedFirstYear, {ects: allEcts[0]})}\n`;
-        if (allEcts[0] < ectsFirstYear) {
-            recapText += `${window.interpolateString(t.missingEctsFirstYear, {missing: ectsFirstYear - allEcts[0]})}\n`;
-        } else {
-            recapText += t.enoughEctsFirstYear + "\n";
+    // Mark the years and add label to repeated years
+    results.sort((a, b) => a.year - b.year); // Chronological order
+    results.forEach(result => {
+        if (!repeatedYears[result.yearCode]) {
+            repeatedYears[result.yearCode] = true;
+        } else if (result.yearCode > 0) {
+            result.text = result.text.replace(result.when, `${result.when} (${t.repeatedYear})`);
         }
+    })
+}
 
-        if (allEcts.length > 1) {
-            recapText += `\n${window.interpolateString(t.creditsEarnedSecondYear, {ects: allEcts[1]})}\n`;
-            if (allEcts[1] < ectsSecondYear) {
-                recapText += `${window.interpolateString(t.missingEctsSecondYear, {missing: ectsSecondYear - allEcts[1]})}\n`;
-            }
-            if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
-                recapText += `${window.interpolateString(t.missingEctsAfterTwoYears, {missing: sumEctsNeeded - allEcts[1] - allEcts[0], required: sumEctsNeeded})}\n`;
-            } else {
-                recapText += `${window.interpolateString(t.enoughEctsAfterTwoYears, {acquired: allEcts[0] + allEcts[1]})}\n`;
-            }
-        }
-
-        if (allEcts.length > 2) {
-            recapText += `\n${window.interpolateString(t.creditsEarnedThirdYear, {ects: allEcts[2]})}\n`;
-            if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
-                recapText += `${window.interpolateString(t.missingEctsForDegree, {missing: diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0], required: diplomaEcts, acquired: allEcts[0] + allEcts[1] + allEcts[2]})}\n\n`;
-            } else {
-                recapText += `${window.interpolateString(t.enoughEctsForDegree, {acquired: allEcts[0] + allEcts[1] + allEcts[2]})}\n\n`;
-            }
-        }
-
-        let gpaText = paddwithSep(t.generalAverage) + "\n";
-        let allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
-        let allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
-        gpaText += window.interpolateString(t.generalGPAText, {gpa: allGpaWeightedAverage.toFixed(2)}) + "\n";
-        gpaText += window.interpolateString(t.generalAverageText, {average: allGradeWeightedAverage.toFixed(1)}) + "\n\n";
-
-        let catText = await fetchCreditsData()
-
-        addTextToHtml(gpaText);
-        addTextToHtml(catText);
-        addTextToHtml(recapText);
+// Yearly Credits details
+function processYearlyCredits() {
+    let recapText = padWithSep(t.creditsByYear) + "\n";
+    recapText += `${window.interpolateString(t.creditsEarnedFirstYear, {ects: allEcts[0]})}\n`;
+    if (allEcts[0] < ectsFirstYear) {
+        recapText += `${window.interpolateString(t.missingEctsFirstYear, {missing: ectsFirstYear - allEcts[0]})}\n`;
+    } else {
+        recapText += t.enoughEctsFirstYear + "\n";
     }
-});
+    if (repeatedYears[2]) {
+        recapText += `\n${window.interpolateString(t.creditsEarnedSecondYear, {ects: allEcts[1]})}\n`;
+        if (allEcts[1] < ectsSecondYear) {
+            recapText += `${window.interpolateString(t.missingEctsSecondYear, {missing: ectsSecondYear - allEcts[1]})}\n`;
+        }
+        if (allEcts[0] + allEcts[1] < sumEctsNeeded) {
+            recapText += `${window.interpolateString(t.missingEctsAfterTwoYears, {
+                missing: sumEctsNeeded - allEcts[1] - allEcts[0],
+                required: sumEctsNeeded
+            })}\n`;
+        } else {
+            recapText += `${window.interpolateString(t.enoughEctsAfterTwoYears, {acquired: allEcts[0] + allEcts[1]})}\n`;
+        }
+    }
+    if (repeatedYears[3]) {
+        recapText += `\n${window.interpolateString(t.creditsEarnedThirdYear, {ects: allEcts[2]})}\n`;
+        if (allEcts[0] + allEcts[1] + allEcts[2] < diplomaEcts) {
+            recapText += `${window.interpolateString(t.missingEctsForDegree, {
+                missing: diplomaEcts - allEcts[2] - allEcts[1] - allEcts[0],
+                required: diplomaEcts,
+                acquired: allEcts[0] + allEcts[1] + allEcts[2]
+            })}\n`;
+        } else {
+            recapText += `${window.interpolateString(t.enoughEctsForDegree, {acquired: allEcts[0] + allEcts[1] + allEcts[2]})}\n`;
+        }
+    }
+    addTextToHtml(recapText + "\n");
+}
+
+// Process all credits by category
+async function processCategoryCredits() {
+    try {
+        // Extract student ID (####) from the current URL
+        const currentUrl = window.location.href;
+        const match = currentUrl.match(/mon-dossier-pedagogique\/(\d+)/);
+        if (!match) {
+            console.error("Student ID not found in URL.");
+            return;
+        }
+        const studentId = match[1];
+
+        // Fetch the credit summary page
+        const response = await fetch(`/dossier-pedagogique/${studentId}/recapitulatifs-credits`);
+        const data = await response.text();
+
+        // Parse the response HTML
+        const parser = new DOMParser();
+        const htmlDoc = parser.parseFromString(data, "text/html");
+        const table = htmlDoc.querySelector("#recapitulatifs-credits tbody");
+
+        if (!table) {
+            console.error("Table not found in the fetched page.");
+            return;
+        }
+
+        // Extract credits data
+        const creditsData = {};
+        const rows = table.querySelectorAll("tr");
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll("td");
+            if (cells.length >= 6) {
+                const category = cells[0].textContent.trim().replace("Cr ", ""); // Remove "Cr " prefix
+                const required = parseFloat(cells[1].textContent.trim());
+                const acquired = parseFloat(cells[2].textContent.trim());
+
+                if (category !== "Ects") {
+                    creditsData[category] = {
+                        required: required,
+                        acquired: acquired,
+                    };
+                }
+            }
+        });
+
+        const catText = formatCreditsData(creditsData);
+        addTextToHtml(catText);
+    } catch (error) {
+        console.error("Error fetching credits data:", error);
+    }
+}
+
+// Process average and GPA
+function processAverageAndGpa() {
+    let gpaText = padWithSep(t.generalAverage) + "\n";
+    let allGradeWeightedAverage = allGradeWeightedSum / allCoefSum;
+    let allGpaWeightedAverage = allGpaWeightedSum / allCoefSum;
+    gpaText += window.interpolateString(t.generalGPAText, {gpa: allGpaWeightedAverage.toFixed(2)}) + "\n";
+    gpaText += window.interpolateString(t.generalAverageText, {average: allGradeWeightedAverage.toFixed(1)}) + "\n";
+
+    addTextToHtml(gpaText);
+}
+
+// Process average and GPA by year
+function processYearPanels(){
+    addTextToHtml(padWithSep(t.averagesByYear));
+    results.forEach(result => {
+        addTextToHtml(result.text + "\n");
+    })
+}
+
+// Main job
+fetchAllPanels().then(() => {
+    processYearlyCredits();
+    processCategoryCredits().then(() => {
+        processAverageAndGpa();
+        processYearPanels()
+    });
+}).catch(error => {
+    console.error("Error processing panels:", error);
+})
